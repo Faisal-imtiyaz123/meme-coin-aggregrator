@@ -1,23 +1,19 @@
 // src/utils/rateLimiter.ts
 import { RateLimiterMemory } from 'rate-limiter-flexible';
+import { RateLimiterApi } from '../types';
 
 export class APIRateLimiter {
   private limiters: Map<string, RateLimiterMemory> = new Map();
 
   constructor() {
     // Initialize rate limiters for different APIs
-    this.limiters.set('dexscreener', new RateLimiterMemory({
+    this.limiters.set(RateLimiterApi.DEX_SCREENER, new RateLimiterMemory({
       points: 300,
       duration: 60 // 300 requests per minute
     }));
     
-    this.limiters.set('geckoterminal', new RateLimiterMemory({
+    this.limiters.set(RateLimiterApi.GECKO_TERMINAL, new RateLimiterMemory({
       points: 100,
-      duration: 60
-    }));
-    
-    this.limiters.set('jupiter', new RateLimiterMemory({
-      points: 200,
       duration: 60
     }));
   }
@@ -54,7 +50,6 @@ export class ExponentialBackoff {
         if (attempt === maxAttempts) {
           break;
         }
-
         const delay = baseDelay * Math.pow(2, attempt - 1);
         await new Promise(resolve => setTimeout(resolve, delay + Math.random() * 1000));
       }

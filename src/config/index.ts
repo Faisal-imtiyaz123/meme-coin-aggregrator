@@ -19,11 +19,6 @@ export const config = {
       rateLimit: 100,
       retryAttempts: 3
     },
-    jupiter: {
-      baseUrl:'https://lite-api.jup.ag',
-      rateLimit: 200,
-      retryAttempts: 3
-    }
   },
   aggregation: {
     updateInterval: 10000, // 10 seconds

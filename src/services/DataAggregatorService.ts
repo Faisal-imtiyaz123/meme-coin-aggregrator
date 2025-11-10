@@ -1,6 +1,6 @@
 // src/services/DataAggregatorService.ts
 import axios, { AxiosInstance } from 'axios';
-import { TokenData } from '../types';
+import { RateLimiterApi, TokenData } from '../types';
 import { APIRateLimiter, ExponentialBackoff } from '../utils/rateLimiter';
 import { logger } from '../utils/logger';
 import { config } from '../config';
@@ -8,7 +8,6 @@ import { config } from '../config';
 export class DataAggregatorService {
   private dexscreenerClient: AxiosInstance;
   private geckoterminalClient: AxiosInstance;
-  private jupiterClient: AxiosInstance;
   private rateLimiter: APIRateLimiter;
 
   constructor() {
@@ -29,15 +28,6 @@ export class DataAggregatorService {
         'User-Agent': 'MemeCoinAggregator/1.0'
       }
     });
-    
-    this.jupiterClient = axios.create({
-      baseURL: config.api.jupiter.baseUrl,
-      timeout: 10000,
-      headers: {
-        'User-Agent': 'MemeCoinAggregator/1.0'
-      }
-    });
-
     this.setupInterceptors();
   }
 
@@ -53,14 +43,14 @@ export class DataAggregatorService {
       return Promise.reject(error);
     };
 
-    [this.dexscreenerClient, this.geckoterminalClient, this.jupiterClient].forEach(client => {
+    [this.dexscreenerClient, this.geckoterminalClient].forEach(client => {
       client.interceptors.response.use(responseInterceptor, errorInterceptor);
     });
   }
 
 async fetchFromDexScreener(): Promise<TokenData[]> {
   return ExponentialBackoff.retry(async () => {
-    await this.rateLimiter.checkLimit('dexscreener');
+    await this.rateLimiter.checkLimit(RateLimiterApi.DEX_SCREENER);
     
     const response = await this.dexscreenerClient.get('/search?q=SOLANA');
     const pairs = response.data.pairs || [];
@@ -71,7 +61,6 @@ async fetchFromDexScreener(): Promise<TokenData[]> {
       .map((dsToken: any) => {
         try {
           const baseToken = dsToken.baseToken || {};
-          
           return {
             // Basic Identification
             token_address: baseToken.address?.toLowerCase() || '',
@@ -134,7 +123,7 @@ async fetchFromDexScreener(): Promise<TokenData[]> {
 
 async fetchFromGeckoTerminal(): Promise<TokenData[]> {
   return ExponentialBackoff.retry(async () => {
-    await this.rateLimiter.checkLimit('coingecko');
+    await this.rateLimiter.checkLimit(RateLimiterApi.GECKO_TERMINAL);
     
     // Get popular Solana tokens
     const response = await this.geckoterminalClient.get('/coins/markets?vs_currency=usd&platform=solana');
@@ -296,7 +285,6 @@ private mergeTokenData(tokenA: TokenData, tokenB: TokenData): TokenData {
         tokensArrays.push(dexscreenerTokens.value);
         logger.info(`Fetched ${dexscreenerTokens.value.length} tokens from DexScreener`);
       }
-      console.log(geckoterminalTokens)
       if (geckoterminalTokens.status === 'fulfilled') {
         tokensArrays.push(geckoterminalTokens.value);
         logger.info(`Fetched ${geckoterminalTokens.value.length} tokens from GeckoTerminal`);

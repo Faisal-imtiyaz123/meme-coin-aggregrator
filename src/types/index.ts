@@ -73,6 +73,10 @@ export interface WebSocketMessage {
   timestamp: number;
 }
 
+export enum RateLimiterApi {
+  DEX_SCREENER="dexscreener",
+  GECKO_TERMINAL="geckoterminal",
+}
 export interface CacheConfig {
   ttl: number;
   key: string;
