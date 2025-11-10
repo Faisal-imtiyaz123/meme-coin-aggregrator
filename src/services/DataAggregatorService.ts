@@ -104,17 +104,19 @@ export class DataAggregatorService {
       const tokens = response.data || [];
       
       return tokens.slice(0, config.aggregation.batchSize).map((token: any) => {
-        const attributes = token.attributes;
         const solPrice = 20; // Approximate SOL price
-        
+        const priceSol = token.current_price ? token.current_price / solPrice : 0;
+        const volumeSol = token.total_volume ? token.total_volume / solPrice : 0;
+        const marketCapSol = token.market_cap ? token.market_cap / solPrice : 0;
+
         return {
           token_address: token.id?.split('_')[1]?.toLowerCase() || token.id?.toLowerCase(),
-          token_name: attributes.name || 'Unknown',
-          token_ticker: attributes.symbol || 'UNKNOWN',
-          price_sol: attributes.price_usd ? attributes.price_usd / solPrice : 0,
-          market_cap_sol: attributes.fdv_usd ? attributes.fdv_usd / solPrice : 0,
-          volume_sol: attributes.volume_usd?.h24 ? attributes.volume_usd.h24 / solPrice : 0,
-          liquidity_sol: attributes.reserve_in_usd ? attributes.reserve_in_usd / solPrice : 0,
+          token_name: token.name || 'Unknown',
+          token_ticker: token.symbol || 'UNKNOWN',
+          price_sol:priceSol,
+          market_cap_sol:marketCapSol,
+          volume_sol:volumeSol,
+          liquidity_sol: 0,
           transaction_count: 0, // Not provided by GeckoTerminal
           price_1hr_change: attributes.price_change_percentage?.h1 || 0,
           price_24hr_change: attributes.price_change_percentage?.h24 || 0,
@@ -175,7 +177,7 @@ export class DataAggregatorService {
         tokensArrays.push(dexscreenerTokens.value);
         logger.info(`Fetched ${dexscreenerTokens.value.length} tokens from DexScreener`);
       }
-      
+      console.log(geckoterminalTokens)
       if (geckoterminalTokens.status === 'fulfilled') {
         tokensArrays.push(geckoterminalTokens.value);
         logger.info(`Fetched ${geckoterminalTokens.value.length} tokens from GeckoTerminal`);

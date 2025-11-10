@@ -1,23 +1,53 @@
 // src/types/index.ts
 export interface TokenData {
+  // Basic Identification
   token_address: string;
   token_name: string;
   token_ticker: string;
-  price_sol: number;
-  market_cap_sol: number;
-  volume_sol: number;
-  liquidity_sol: number;
+  
+  // Price Data
+  price: number;  // Changed from price_sol to price (in USD)
+  priceChange1h: number;
+  priceChange6h: number;
+  priceChange24h: number;
+  priceChangePercentage24h: number;
+  
+  // Market Data
+  marketCap: number;  // Changed from market_cap_sol
+  marketCapChange24h: number;
+  marketCapChangePercentage24h: number;
+  volume24h: number;  // Changed from volume_sol
+  
+  // Supply Data
+  circulatingSupply: number;
+  totalSupply: number;
+  
+  // Additional Metrics
+  liquidity: number;  // Changed from liquidity_sol
+  high_24h: number;
+  low_24h: number;
   transaction_count: number;
-  price_1hr_change: number;
-  price_24hr_change?: number;
-  price_7d_change?: number;
-  protocol: string;
-  dex_url?: string;
-  source: string[];
-  last_updated: number;
+  
+  // Historical Data
+  ath: number;
+  athChangePercentage: number;
+  athDate: string;
+  atl: number;
+  atlChangePercentage: number;
+  atlDate: string;
+  roi: number | null;
+  
+  // Source & Metadata
+  dex: string;        // Changed from protocol
+  dexUrl: string;
+  image: string;
+  rank: number | null;
+  source: string[];   // Keep as array
+  lastUpdated: string; // Changed from number to string
   is_merged?: boolean;
 }
 
+// Keep other interfaces the same...
 export interface PaginatedResponse {
   tokens: TokenData[];
   next_cursor?: string;
