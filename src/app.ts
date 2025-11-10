@@ -13,6 +13,7 @@ import { WebSocketService } from './services/WebSocketService';
 import { TokenController } from './controllers/TokenController';
 import { config } from './config';
 import { logger } from './utils/logger';
+import { TokenData } from './types';
 
 class MemeCoinAggregator {
   private app: express.Application;

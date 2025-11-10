@@ -13,7 +13,7 @@ export interface TokenData {
   price_7d_change?: number;
   protocol: string;
   dex_url?: string;
-  source: 'dexscreener' | 'geckoterminal' | 'jupiter';
+  source: string[];
   last_updated: number;
   is_merged?: boolean;
 }

@@ -77,16 +77,15 @@ export class TokenController {
           return;
         }
         
-        token = tokens.find(t => 
+        const foundToken = tokens.find(t => 
           t.token_address.toLowerCase() === address.toLowerCase()
         );
-        
-        if (!token) {
+        if (!foundToken) {
           res.status(404).json({ error: 'Token not found' });
           return;
         }
+        token = foundToken
       }
-
       res.json(token);
     } catch (error) {
       logger.error('Error in getTokenByAddress:', error);

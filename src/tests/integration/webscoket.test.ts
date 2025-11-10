@@ -2,8 +2,9 @@
 import { createServer } from 'http';
 import { Server as SocketIOServer } from 'socket.io';
 import { io as Client, Socket } from 'socket.io-client';
-import { WebSocketService } from '../../src/services/WebSocketService';
-import { CacheService } from '../../src/services/CacheService';
+import { WebSocketService } from '../../services/WebSocketService';
+import { CacheService } from '../../services/CacheService';
+
 
 describe('WebSocket Integration Tests', () => {
   let io: SocketIOServer;

@@ -89,7 +89,7 @@ export class DataAggregatorService {
           price_24hr_change: pair.priceChange?.h24 || 0,
           protocol: pair.dexId || 'Unknown',
           dex_url: pair.url,
-          source: 'dexscreener',
+          source: ['dexscreener'],
           last_updated: Date.now()
         } as TokenData;
       }).filter((token: TokenData) => token.token_address && token.price_sol > 0);
@@ -100,8 +100,8 @@ export class DataAggregatorService {
     return ExponentialBackoff.retry(async () => {
       await this.rateLimiter.checkLimit('geckoterminal');
       
-      const response = await this.geckoterminalClient.get('/networks/solana/tokens');
-      const tokens = response.data.data || [];
+      const response = await this.geckoterminalClient.get('/coins/markets?vs_currency=usd&platform=solana');
+      const tokens = response.data || [];
       
       return tokens.slice(0, config.aggregation.batchSize).map((token: any) => {
         const attributes = token.attributes;
@@ -119,44 +119,12 @@ export class DataAggregatorService {
           price_1hr_change: attributes.price_change_percentage?.h1 || 0,
           price_24hr_change: attributes.price_change_percentage?.h24 || 0,
           protocol: 'Unknown',
-          source: 'geckoterminal',
+          source: ['geckoterminal'],
           last_updated: Date.now()
         } as TokenData;
       }).filter((token: TokenData) => token.token_address && token.price_sol > 0);
     }, config.api.geckoterminal.retryAttempts);
   }
-
-  async fetchFromJupiter(): Promise<TokenData[]> {
-    return ExponentialBackoff.retry(async () => {
-      await this.rateLimiter.checkLimit('jupiter');
-      
-      // For Jupiter, we need to get popular token addresses first
-      const popularTokens = [
-        'So11111111111111111111111111111111111111112', // SOL
-        'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', // USDC
-        // Add more popular token addresses
-      ];
-      
-      const response = await this.jupiterClient.get(`/price?ids=${popularTokens.join(',')}`);
-      const prices = response.data.data || {};
-      
-      return Object.entries(prices).map(([address, priceData]: [string, any]) => ({
-        token_address: address.toLowerCase(),
-        token_name: priceData.tokenName || 'Unknown',
-        token_ticker: priceData.tokenSymbol || 'UNKNOWN',
-        price_sol: priceData.price || 0,
-        market_cap_sol: 0, // Not provided
-        volume_sol: 0, // Not provided
-        liquidity_sol: 0, // Not provided
-        transaction_count: 0,
-        price_1hr_change: 0,
-        protocol: 'Jupiter',
-        source: 'jupiter',
-        last_updated: Date.now()
-      } as TokenData));
-    }, config.api.jupiter.retryAttempts);
-  }
-
   mergeTokens(tokensArrays: TokenData[][]): TokenData[] {
     const tokenMap = new Map<string, TokenData>();
     
@@ -171,15 +139,18 @@ export class DataAggregatorService {
         
         // Prefer data from source with higher liquidity
         const shouldReplace = token.liquidity_sol > existing.liquidity_sol;
-        
+        const mergedSources = Array.from(new Set([
+        ...(Array.isArray(existing.source) ? existing.source : [existing.source]),
+        ...(Array.isArray(token.source) ? token.source : [token.source]),
+      ]));
         if (shouldReplace) {
           tokenMap.set(key, {
             ...token,
             is_merged: true,
-            source: existing.source + ',' + token.source
+            source: mergedSources
           });
         } else {
-          existing.source += ',' + token.source;
+          existing.source = mergedSources
         }
       } else {
         tokenMap.set(key, { ...token, is_merged: false });
@@ -193,10 +164,9 @@ export class DataAggregatorService {
 
   async getAllTokens(): Promise<TokenData[]> {
     try {
-      const [dexscreenerTokens, geckoterminalTokens, jupiterTokens] = await Promise.allSettled([
+      const [dexscreenerTokens, geckoterminalTokens] = await Promise.allSettled([
         this.fetchFromDexScreener(),
         this.fetchFromGeckoTerminal(),
-        this.fetchFromJupiter()
       ]);
 
       const tokensArrays = [];
@@ -209,11 +179,6 @@ export class DataAggregatorService {
       if (geckoterminalTokens.status === 'fulfilled') {
         tokensArrays.push(geckoterminalTokens.value);
         logger.info(`Fetched ${geckoterminalTokens.value.length} tokens from GeckoTerminal`);
-      }
-      
-      if (jupiterTokens.status === 'fulfilled') {
-        tokensArrays.push(jupiterTokens.value);
-        logger.info(`Fetched ${jupiterTokens.value.length} tokens from Jupiter`);
       }
 
       const mergedTokens = this.mergeTokens(tokensArrays);

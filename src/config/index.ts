@@ -15,12 +15,12 @@ export const config = {
       retryAttempts: 3
     },
     geckoterminal: {
-      baseUrl: 'https://api.geckoterminal.com/api/v2',
+      baseUrl: 'https://api.coingecko.com/api/v3',
       rateLimit: 100,
       retryAttempts: 3
     },
     jupiter: {
-      baseUrl: 'https://price.jup.ag/v4',
+      baseUrl:'https://lite-api.jup.ag',
       rateLimit: 200,
       retryAttempts: 3
     }

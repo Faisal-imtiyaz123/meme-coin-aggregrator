@@ -1,11 +1,11 @@
-// tests/integration/api.test.ts
+// tests/integration/api.testts
 import request from 'supertest';
 import { createServer } from 'http';
 import { Server as SocketIOServer } from 'socket.io';
 import express from 'express';
-import { CacheService } from '../../src/services/CacheService';
-import { DataAggregatorService } from '../../src/services/DataAggregatorService';
-import { TokenController } from '../../src/controllers/TokenController';
+import { CacheService } from '../../services/CacheService';
+import { DataAggregatorService } from '../../services/DataAggregatorService';
+import { TokenController } from '../../controllers/TokenController';
 
 describe('API Integration Tests', () => {
   let app: express.Application;
