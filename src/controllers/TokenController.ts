@@ -84,7 +84,7 @@ export class TokenController {
           res.status(404).json({ error: 'Token not found' });
           return;
         }
-        token = foundToken
+        token = foundToken;
       }
       res.json(token);
     } catch (error) {
@@ -107,21 +107,32 @@ export class TokenController {
 
       const stats = {
         total_tokens: tokens.length,
-        total_volume_24h: tokens.reduce((sum, token) => sum + token.volume_sol, 0),
-        total_liquidity: tokens.reduce((sum, token) => sum + token.liquidity_sol, 0),
-        average_price_change_1h: tokens.reduce((sum, token) => sum + token.price_1hr_change, 0) / tokens.length,
-        average_price_change_24h: tokens.reduce((sum, token) => sum + (token.price_24hr_change || 0), 0) / tokens.length,
+        total_volume_24h: tokens.reduce((sum, token) => sum + (token.volume24h || 0), 0),
+        total_liquidity: tokens.reduce((sum, token) => sum + (token.liquidity || 0), 0),
+        total_market_cap: tokens.reduce((sum, token) => sum + (token.marketCap || 0), 0),
+        average_price_change_1h: tokens.reduce((sum, token) => sum + (token.priceChange1h || 0), 0) / tokens.length,
+        average_price_change_24h: tokens.reduce((sum, token) => sum + (token.priceChange24h || 0), 0) / tokens.length,
         top_gainer_1h: tokens.reduce((max, token) => 
-          token.price_1hr_change > max.price_1hr_change ? token : max
+          (token.priceChange1h || 0) > (max.priceChange1h || 0) ? token : max
         ),
         top_loser_1h: tokens.reduce((min, token) => 
-          token.price_1hr_change < min.price_1hr_change ? token : min
+          (token.priceChange1h || 0) < (min.priceChange1h || 0) ? token : min
+        ),
+        top_gainer_24h: tokens.reduce((max, token) => 
+          (token.priceChangePercentage24h || 0) > (max.priceChangePercentage24h || 0) ? token : max
+        ),
+        top_loser_24h: tokens.reduce((min, token) => 
+          (token.priceChangePercentage24h || 0) < (min.priceChangePercentage24h || 0) ? token : min
         ),
         highest_volume: tokens.reduce((max, token) => 
-          token.volume_sol > max.volume_sol ? token : max
+          (token.volume24h || 0) > (max.volume24h || 0) ? token : max
         ),
-        last_updated: Math.max(...tokens.map(t => t.last_updated)),
-        protocols: Array.from(new Set(tokens.map(t => t.protocol))).filter(Boolean)
+        highest_market_cap: tokens.reduce((max, token) => 
+          (token.marketCap || 0) > (max.marketCap || 0) ? token : max
+        ),
+        last_updated: new Date().toISOString(),
+        dexs: Array.from(new Set(tokens.map(t => t.dex))).filter(Boolean),
+        sources: Array.from(new Set(tokens.flatMap(t => t.source || []))).filter(Boolean)
       };
 
       res.json(stats);
@@ -139,24 +150,40 @@ export class TokenController {
 
     // Apply liquidity filter
     if (filters.min_liquidity) {
-      filtered = filtered.filter(token => token.liquidity_sol >= filters.min_liquidity!);
+      filtered = filtered.filter(token => (token.liquidity || 0) >= filters.min_liquidity!);
     }
 
     // Apply volume filter
     if (filters.min_volume) {
-      filtered = filtered.filter(token => token.volume_sol >= filters.min_volume!);
+      filtered = filtered.filter(token => (token.volume24h || 0) >= filters.min_volume!);
     }
 
-    // Apply protocol filter
+    // Apply protocol filter (now called 'dex')
     if (filters.protocol) {
       filtered = filtered.filter(token => 
-        token.protocol.toLowerCase().includes(filters.protocol!.toLowerCase())
+        token.dex.toLowerCase().includes(filters.protocol!.toLowerCase())
       );
     }
 
     // Apply time period filter for price changes
     if (filters.time_period) {
-      const priceChangeField = `price_${filters.time_period}_change` as keyof TokenData;
+      let priceChangeField: keyof TokenData;
+      
+      switch (filters.time_period) {
+        case '1h':
+          priceChangeField = 'priceChange1h';
+          break;
+        case '24h':
+          priceChangeField = 'priceChange24h';
+          break;
+        case '7d':
+          // Note: We don't have 7d change in current interface
+          // You might want to add priceChange7d to TokenData if needed
+          return filtered;
+        default:
+          priceChangeField = 'priceChange24h';
+      }
+      
       filtered = filtered.filter(token => {
         const change = token[priceChangeField] as number;
         return change !== undefined && !isNaN(change);
@@ -166,26 +193,49 @@ export class TokenController {
     // Apply sorting
     if (filters.sort_by) {
       filtered.sort((a, b) => {
-        let aValue: number, bValue: number;
+        let aValue: number = 0;
+        let bValue: number = 0;
 
-        if (filters.sort_by === 'price_change') {
-          const timePeriod = filters.time_period || '1h';
-          const changeField = `price_${timePeriod}_change` as keyof TokenData;
-          aValue = a[changeField] as number || 0;
-          bValue = b[changeField] as number || 0;
-        } else {
-          aValue = a[filters.sort_by as keyof TokenData] as number;
-          bValue = b[filters.sort_by as keyof TokenData] as number;
+        switch (filters.sort_by) {
+          case 'volume':
+            aValue = a.volume24h || 0;
+            bValue = b.volume24h || 0;
+            break;
+          case 'price_change':
+            const timePeriod = filters.time_period || '24h';
+            if (timePeriod === '1h') {
+              aValue = a.priceChange1h || 0;
+              bValue = b.priceChange1h || 0;
+            } else {
+              aValue = a.priceChangePercentage24h || 0;
+              bValue = b.priceChangePercentage24h || 0;
+            }
+            break;
+          case 'market_cap':
+            aValue = a.marketCap || 0;
+            bValue = b.marketCap || 0;
+            break;
+          case 'liquidity':
+            aValue = a.liquidity || 0;
+            bValue = b.liquidity || 0;
+            break;
+          case 'transaction_count':
+            aValue = a.transaction_count || 0;
+            bValue = b.transaction_count || 0;
+            break;
+          default:
+            aValue = a.volume24h || 0;
+            bValue = b.volume24h || 0;
         }
 
         if (filters.sort_order === 'desc') {
           return bValue - aValue;
         }
-        return aValue - aValue;
+        return aValue - bValue;
       });
     } else {
       // Default sort by volume descending
-      filtered.sort((a, b) => b.volume_sol - a.volume_sol);
+      filtered.sort((a, b) => (b.volume24h || 0) - (a.volume24h || 0));
     }
 
     return filtered;
@@ -206,5 +256,42 @@ export class TokenController {
       total_count: tokens.length,
       timestamp: Date.now()
     };
+  }
+
+  // Additional endpoint for token search
+  async searchTokens(req: Request, res: Response): Promise<void> {
+    try {
+      const { q } = req.query;
+      
+      if (!q || typeof q !== 'string') {
+        res.status(400).json({ error: 'Search query is required' });
+        return;
+      }
+
+      const tokens = await this.cacheService.getTokens();
+      if (!tokens) {
+        res.status(404).json({ error: 'No token data available' });
+        return;
+      }
+
+      const searchTerm = q.toLowerCase();
+      const results = tokens.filter(token =>
+        token.token_name.toLowerCase().includes(searchTerm) ||
+        token.token_ticker.toLowerCase().includes(searchTerm) ||
+        token.token_address.toLowerCase().includes(searchTerm)
+      );
+
+      res.json({
+        tokens: results,
+        total_count: results.length,
+        timestamp: Date.now()
+      });
+    } catch (error) {
+      logger.error('Error in searchTokens:', error);
+      res.status(500).json({ 
+        error: 'Failed to search tokens',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
   }
 }

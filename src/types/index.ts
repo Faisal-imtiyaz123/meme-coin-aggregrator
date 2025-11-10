@@ -68,7 +68,7 @@ export interface FilterOptions {
 }
 
 export interface WebSocketMessage {
-  type: 'initial_data' | 'price_update' | 'volume_spike' | 'token_update' | 'batch_update';
+  type: 'initial_data' | 'price_update' | 'volume_spike' | 'market_cap_update' | 'liquidity_update' | 'token_update' | 'batch_update';
   data: any;
   timestamp: number;
 }
