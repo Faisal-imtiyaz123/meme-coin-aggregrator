@@ -31,16 +31,8 @@ export class CacheService {
 
   async setTokens(tokens: TokenData[], ttl: number = this.DEFAULT_TTL): Promise<void> {
     try {
+      console.log("tokens set")
       await this.redis.setex('tokens:all', ttl, JSON.stringify(tokens));
-      
-      // Also cache individual tokens for quick lookup
-      for (const token of tokens.slice(0, 100)) { // Cache top 100 individually
-        await this.redis.setex(
-          `token:${token.token_address}`, 
-          ttl, 
-          JSON.stringify(token)
-        );
-      }
     } catch (error) {
       logger.error('Error caching tokens:', error);
       throw error;

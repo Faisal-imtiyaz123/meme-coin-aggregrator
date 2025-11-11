@@ -1,4 +1,3 @@
-// src/app.ts
 import express from 'express';
 import { createServer } from 'http';
 import { Server as SocketIOServer } from 'socket.io';
@@ -44,15 +43,15 @@ class MemeCoinAggregator {
 
     this.setupMiddleware();
     this.setupRoutes();
-    this.startBackgroundJobs();
+    // this.startBackgroundJobs();
   }
 
   private setupMiddleware(): void {
-    // Security middleware
+    // for security purposes
     this.app.use(helmet());
     this.app.use(cors());
     
-    // Compression middleware
+    // for compression
     this.app.use(compression());
     
     // JSON parsing
@@ -74,7 +73,7 @@ class MemeCoinAggregator {
   }
 
   private setupRoutes(): void {
-    // Health check
+    // to check api health
     this.app.get('/health', (req, res) => {
       res.json({ 
         status: 'healthy', 
@@ -87,7 +86,6 @@ class MemeCoinAggregator {
     // API routes
     this.app.get('/api/tokens', this.tokenController.getTokens.bind(this.tokenController));
     this.app.get('/api/tokens/:address', this.tokenController.getTokenByAddress.bind(this.tokenController));
-    this.app.get('/api/stats', this.tokenController.getStats.bind(this.tokenController));
     
     // 404 handler
     this.app.use('*', (req, res) => {
@@ -117,59 +115,11 @@ class MemeCoinAggregator {
       // Broadcast updates via WebSocket
       this.websocketService.broadcastTokenUpdate(freshTokens);
       
-      // Check for significant changes
-      await this.detectSignificantChanges(freshTokens);
-      
     } catch (error) {
       logger.error('Error updating token data:', error);
     }
   }
-
- private async detectSignificantChanges(freshTokens: TokenData[]): Promise<void> {
-  try {
-    const cachedTokens = await this.cacheService.getTokens();
-    if (!cachedTokens) return;
-
-    const cachedMap = new Map(cachedTokens.map(token => [token.token_address, token]));
-    
-    for (const freshToken of freshTokens) {
-      const cachedToken = cachedMap.get(freshToken.token_address);
-      if (cachedToken) {
-        // Check for significant price changes (5% threshold)
-        if (cachedToken.price > 0 && freshToken.price > 0) {
-          const priceDiff = Math.abs(freshToken.price - cachedToken.price) / cachedToken.price;
-          if (priceDiff > 0.05) { // 5% change
-            this.websocketService.broadcastPriceChange(freshToken, cachedToken.price);
-          }
-        }
-        
-        // Check for volume spikes (2x threshold)
-        if (cachedToken.volume24h > 0 && freshToken.volume24h > cachedToken.volume24h * 2) {
-          this.websocketService.broadcastVolumeSpike(freshToken);
-        }
-        
-        // Check for large market cap changes (10% threshold)
-        if (cachedToken.marketCap > 0 && freshToken.marketCap > 0) {
-          const marketCapDiff = Math.abs(freshToken.marketCap - cachedToken.marketCap) / cachedToken.marketCap;
-          if (marketCapDiff > 0.10) { // 10% change
-            this.websocketService.broadcastMarketCapChange(freshToken, cachedToken.marketCap);
-          }
-        }
-        
-        // Check for significant liquidity changes (20% threshold)
-        if (cachedToken.liquidity > 0 && freshToken.liquidity > 0) {
-          const liquidityDiff = Math.abs(freshToken.liquidity - cachedToken.liquidity) / cachedToken.liquidity;
-          if (liquidityDiff > 0.20) { // 20% change
-            this.websocketService.broadcastLiquidityChange(freshToken, cachedToken.liquidity);
-          }
-        }
-      }
-    }
-  } catch (error) {
-    logger.error('Error detecting significant changes:', error);
-  }
-}
-
+  
   private startBackgroundJobs(): void {
     // Initial data load
     setTimeout(() => this.updateTokenData(), 1000);

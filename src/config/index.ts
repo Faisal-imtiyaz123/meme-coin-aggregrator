@@ -1,4 +1,3 @@
-// src/config/index.ts
 export const config = {
   server: {
     port: process.env.PORT || 3000,

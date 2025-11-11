@@ -25,8 +25,6 @@ describe('API Integration Tests', () => {
     app.use(express.json());
     app.get('/api/tokens', (req, res) => tokenController.getTokens(req, res));
     app.get('/api/tokens/:address', (req, res) => tokenController.getTokenByAddress(req, res));
-    app.get('/api/stats', (req, res) => tokenController.getStats(req, res));
-    app.get('/api/tokens/search', (req, res) => tokenController.searchTokens(req, res));
   });
 
   afterAll(async () => {

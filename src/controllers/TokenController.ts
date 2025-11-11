@@ -36,7 +36,7 @@ export class TokenController {
         tokens = await this.dataAggregator.getAllTokens();
         await this.cacheService.setTokens(tokens);
       }
-
+      logger.info('Cache hit')
       // Apply filters
       const filteredTokens = this.applyFilters(tokens, filters);
       
