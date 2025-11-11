@@ -2,7 +2,6 @@ import Redis from "ioredis";
 import { CacheService } from "../../services/CacheService";
 import { TokenData } from "../../types";
 
-
 jest.mock('ioredis');
 
 describe('CacheService', () => {

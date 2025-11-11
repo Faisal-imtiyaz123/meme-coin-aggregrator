@@ -95,17 +95,17 @@ export class TokenController {
   private applyFilters(tokens: TokenData[], filters: FilterOptions): TokenData[] {
     let filtered = [...tokens];
 
-    // Apply liquidity filter
+    // liquidity filter
     if (filters.min_liquidity) {
       filtered = filtered.filter(token => (token.liquidity || 0) >= filters.min_liquidity!);
     }
 
-    // Apply volume filter
+    // Volume filter
     if (filters.min_volume) {
       filtered = filtered.filter(token => (token.volume24h || 0) >= filters.min_volume!);
     }
 
-    // Apply protocol filter (now called 'dex')
+    // Protocol Filter
     if (filters.protocol) {
       filtered = filtered.filter(token => 
         token.dex.toLowerCase().includes(filters.protocol!.toLowerCase())
@@ -124,8 +124,6 @@ export class TokenController {
           priceChangeField = 'priceChange24h';
           break;
         case '7d':
-          // Note: We don't have 7d change in current interface
-          // You might want to add priceChange7d to TokenData if needed
           return filtered;
         default:
           priceChangeField = 'priceChange24h';

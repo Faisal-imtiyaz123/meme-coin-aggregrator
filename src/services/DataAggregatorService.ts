@@ -1,4 +1,3 @@
-// src/services/DataAggregatorService.ts
 import axios, { AxiosInstance } from 'axios';
 import { RateLimiterApi, TokenData } from '../types';
 import { APIRateLimiter, ExponentialBackoff } from '../utils/rateLimiter';
@@ -17,7 +16,7 @@ export class DataAggregatorService {
     };
   }
 
-  /** Create a preconfigured axios client */
+  //axios clients
   private createClient(baseURL: string): AxiosInstance {
     const client = axios.create({
       baseURL,
@@ -39,7 +38,7 @@ export class DataAggregatorService {
     return client;
   }
 
-  /** Unified fetch with retry + rate limit */
+ // rate limit and fetch
   private async fetchWithRetry<T>(
     api: RateLimiterApi,
     request: () => Promise<T>,
@@ -51,7 +50,7 @@ export class DataAggregatorService {
     }, retries);
   }
 
-  /** Fetch and map from DexScreener */
+  // fetch from dexscreener
   async fetchFromDexScreener(): Promise<TokenData[]> {
     const { dexscreener } = this.clients;
 
@@ -71,7 +70,7 @@ export class DataAggregatorService {
     );
   }
 
-  /** Fetch and map from CoinGecko/GeckoTerminal */
+  // fetch from geckoterminal
   async fetchFromGeckoTerminal(): Promise<TokenData[]> {
     const { geckoterminal } = this.clients;
 
@@ -88,7 +87,7 @@ export class DataAggregatorService {
     );
   }
 
-  /** Merge multiple token arrays */
+  // merge token arrays
   mergeTokens(tokenArrays: TokenData[][]): TokenData[] {
     const tokenMap = new Map<string, TokenData>();
 
@@ -104,11 +103,10 @@ export class DataAggregatorService {
     }
 
     return Array.from(tokenMap.values())
-      .sort((a, b) => (b.volume24h || 0) - (a.volume24h || 0))
       .slice(0, config.aggregation.maxTokens);
   }
 
-  /** Aggregate everything */
+  // aggregrate
   async getAllTokens(): Promise<TokenData[]> {
     try {
       const [dex, gecko] = await Promise.allSettled([

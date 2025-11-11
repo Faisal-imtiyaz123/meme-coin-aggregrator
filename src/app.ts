@@ -12,7 +12,6 @@ import { WebSocketService } from './services/WebSocketService';
 import { TokenController } from './controllers/TokenController';
 import { config } from './config';
 import { logger } from './utils/logger';
-import { TokenData } from './types';
 
 class MemeCoinAggregator {
   private app: express.Application;
@@ -115,11 +114,59 @@ class MemeCoinAggregator {
       // Broadcast updates via WebSocket
       this.websocketService.broadcastTokenUpdate(freshTokens);
       
+      // Check for significant changes
+      //  await this.detectSignificantChanges(freshTokens);
+      
     } catch (error) {
       logger.error('Error updating token data:', error);
     }
   }
-  
+
+//  private async detectSignificantChanges(freshTokens: TokenData[]): Promise<void> {
+//   try {
+//     const cachedTokens = await this.cacheService.getTokens();
+//     if (!cachedTokens) return;
+
+//     const cachedMap = new Map(cachedTokens.map(token => [token.token_address, token]));
+    
+//     for (const freshToken of freshTokens) {
+//       const cachedToken = cachedMap.get(freshToken.token_address);
+//       if (cachedToken) {
+//         // Check for significant price changes (5% threshold)
+//         if (cachedToken.price > 0 && freshToken.price > 0) {
+//           const priceDiff = Math.abs(freshToken.price - cachedToken.price) / cachedToken.price;
+//           if (priceDiff > 0.05) { // 5% change
+//             this.websocketService.broadcastPriceChange(freshToken, cachedToken.price);
+//           }
+//         }
+        
+//         // Check for volume spikes (2x threshold)
+//         if (cachedToken.volume24h > 0 && freshToken.volume24h > cachedToken.volume24h * 2) {
+//           this.websocketService.broadcastVolumeSpike(freshToken);
+//         }
+        
+//         // Check for large market cap changes (10% threshold)
+//         if (cachedToken.marketCap > 0 && freshToken.marketCap > 0) {
+//           const marketCapDiff = Math.abs(freshToken.marketCap - cachedToken.marketCap) / cachedToken.marketCap;
+//           if (marketCapDiff > 0.10) { // 10% change
+//             this.websocketService.broadcastMarketCapChange(freshToken, cachedToken.marketCap);
+//           }
+//         }
+        
+//         // Check for significant liquidity changes (20% threshold)
+//         if (cachedToken.liquidity > 0 && freshToken.liquidity > 0) {
+//           const liquidityDiff = Math.abs(freshToken.liquidity - cachedToken.liquidity) / cachedToken.liquidity;
+//           if (liquidityDiff > 0.20) { // 20% change
+//             this.websocketService.broadcastLiquidityChange(freshToken, cachedToken.liquidity);
+//           }
+//         }
+//       }
+//     }
+//   } catch (error) {
+//     logger.error('Error detecting significant changes:', error);
+//   }
+// }
+
   private startBackgroundJobs(): void {
     // Initial data load
     setTimeout(() => this.updateTokenData(), 1000);
@@ -137,10 +184,10 @@ class MemeCoinAggregator {
     const port = config.server.port;
     
     this.server.listen(port, () => {
-      logger.info(`🚀 Meme Coin Aggregator running on port ${port}`);
-      logger.info(`📊 API available at http://localhost:${port}/api`);
-      logger.info(`🔌 WebSocket available at ws://localhost:${port}`);
-      logger.info(`❤️  Health check at http://localhost:${port}/health`);
+      logger.info(`Meme Coin Aggregator running on port ${port}`);
+      logger.info(`API available at http://localhost:${port}/api`);
+      logger.info(`WebSocket available at ws://localhost:${port}`);
+      logger.info(`Health check at http://localhost:${port}/health`);
     });
   }
 

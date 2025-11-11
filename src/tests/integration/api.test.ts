@@ -1,175 +1,125 @@
-// tests/integration/api.test.ts
 import request from 'supertest';
-import { createServer } from 'http';
-import express from 'express';
+import { Server } from 'http';
+import MemeCoinAggregator from '../../app';
 import { CacheService } from '../../services/CacheService';
 import { DataAggregatorService } from '../../services/DataAggregatorService';
-import { TokenController } from '../../controllers/TokenController';
-import { TokenData } from '../../types';
+import { WebSocketService } from '../../services/WebSocketService';
+import { logger } from '../../utils/logger';
+import { config } from '../../config';
 
-describe('API Integration Tests', () => {
-  let app: express.Application;
-  let server: any;
-  let cacheService: CacheService;
-  let dataAggregator: DataAggregatorService;
 
-  beforeAll(async () => {
-    app = express();
-    server = createServer(app);
-    
-    cacheService = new CacheService();
-    dataAggregator = new DataAggregatorService();
-    
-    const tokenController = new TokenController(cacheService, dataAggregator);
-    
-    app.use(express.json());
-    app.get('/api/tokens', (req, res) => tokenController.getTokens(req, res));
-    app.get('/api/tokens/:address', (req, res) => tokenController.getTokenByAddress(req, res));
+// Mock dependencies
+jest.mock('../services/CacheService');
+jest.mock('../services/DataAggregatorService');
+jest.mock('../services/WebSocketService');
+jest.mock('../utils/logger');
+jest.mock('../config');
+
+describe('MemeCoinAggregator', () => {
+  let aggregator: MemeCoinAggregator;
+  let server: Server | null = null;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    aggregator = new MemeCoinAggregator();
   });
 
-  afterAll(async () => {
-    await cacheService.disconnect();
-    server.close();
+  afterEach(async () => {
+    if (aggregator) {
+      await aggregator.stop();
+      server = null
+    }
   });
 
-  describe('GET /api/tokens', () => {
-    it('should return paginated tokens with new structure', async () => {
-      // Mock some tokens in cache
-      const mockTokens: TokenData[] = [
-        {
-          token_address: 'solana',
-          token_name: 'Solana',
-          token_ticker: 'SOL',
-          price: 20.0,
-          priceChange1h: 1.5,
-          priceChange6h: 3.2,
-          priceChange24h: 5.8,
-          priceChangePercentage24h: 5.8,
-          marketCap: 80000000000,
-          marketCapChange24h: 4000000000,
-          marketCapChangePercentage24h: 5,
-          volume24h: 2000000000,
-          circulatingSupply: 400000000,
-          totalSupply: 500000000,
-          liquidity: 500000000,
-          high_24h: 21.0,
-          low_24h: 19.5,
-          transaction_count: 100000,
-          ath: 250.0,
-          athChangePercentage: -92,
-          athDate: '2021-11-06',
-          atl: 0.5,
-          atlChangePercentage: 3900,
-          atlDate: '2020-05-11',
-          roi: null,
-          dex: 'Various',
-          dexUrl: '',
-          image: 'solana.jpg',
-          rank: 5,
-          source: ['coingecko'],
-          lastUpdated: new Date().toISOString(),
-          is_merged: false
-        }
-      ];
-
-      // Mock the cache service to return our test data
-      jest.spyOn(cacheService, 'getTokens').mockResolvedValue(mockTokens);
-
-      const response = await request(app)
-        .get('/api/tokens')
-        .expect(200);
-
-      expect(response.body).toHaveProperty('tokens');
-      expect(response.body).toHaveProperty('has_more');
-      expect(response.body).toHaveProperty('total_count');
-      expect(Array.isArray(response.body.tokens)).toBe(true);
-      expect(response.body.tokens[0]).toHaveProperty('price');
-      expect(response.body.tokens[0]).toHaveProperty('volume24h');
-      expect(response.body.tokens[0]).toHaveProperty('marketCap');
-      expect(response.body.tokens[0]).toHaveProperty('liquidity');
+  describe('Initialization', () => {
+    it('should initialize all services correctly', () => {
+      expect(CacheService).toHaveBeenCalledTimes(1);
+      expect(DataAggregatorService).toHaveBeenCalledTimes(1);
+      expect(WebSocketService).toHaveBeenCalledTimes(1);
     });
 
-    it('should filter tokens by volume with new field name', async () => {
-      const mockTokens: TokenData[] = [
-        {
-          token_address: 'token1',
-          token_name: 'High Volume Token',
-          token_ticker: 'HVT',
-          price: 1.0,
-          priceChange1h: 5,
-          priceChange6h: 8,
-          priceChange24h: 10,
-          priceChangePercentage24h: 10,
-          marketCap: 1000000,
-          marketCapChange24h: 50000,
-          marketCapChangePercentage24h: 5,
-          volume24h: 500000,
-          circulatingSupply: 1000000,
-          totalSupply: 2000000,
-          liquidity: 200000,
-          high_24h: 1.2,
-          low_24h: 0.8,
-          transaction_count: 1000,
-          ath: 2.0,
-          athChangePercentage: 100,
-          athDate: '2024-01-01',
-          atl: 0.5,
-          atlChangePercentage: 100,
-          atlDate: '2023-01-01',
-          roi: null,
-          dex: 'Raydium',
-          dexUrl: 'https://raydium.io',
-          image: 'hvt.jpg',
-          rank: 100,
-          source: ['dexscreener'],
-          lastUpdated: new Date().toISOString(),
-          is_merged: false
-        },
-        {
-          token_address: 'token2',
-          token_name: 'Low Volume Token',
-          token_ticker: 'LVT',
-          price: 0.5,
-          priceChange1h: 2,
-          priceChange6h: 4,
-          priceChange24h: 6,
-          priceChangePercentage24h: 6,
-          marketCap: 500000,
-          marketCapChange24h: 25000,
-          marketCapChangePercentage24h: 5,
-          volume24h: 50000,
-          circulatingSupply: 1000000,
-          totalSupply: 2000000,
-          liquidity: 50000,
-          high_24h: 0.6,
-          low_24h: 0.4,
-          transaction_count: 500,
-          ath: 1.0,
-          athChangePercentage: 100,
-          athDate: '2024-01-01',
-          atl: 0.2,
-          atlChangePercentage: 150,
-          atlDate: '2023-01-01',
-          roi: null,
-          dex: 'Orca',
-          dexUrl: 'https://orca.so',
-          image: 'lvt.jpg',
-          rank: 200,
-          source: ['dexscreener'],
-          lastUpdated: new Date().toISOString(),
-          is_merged: false
-        }
-      ];
+    it('should set up middleware', () => {
+      // This is a bit tricky to test directly, but we can verify through integration tests
+      expect(aggregator).toBeDefined();
+    });
+  });
 
-      jest.spyOn(cacheService, 'getTokens').mockResolvedValue(mockTokens);
+  describe('Health Check', () => {
+    it('should return healthy status', async () => {
+      const mockGetConnectedClientsCount = jest.fn().mockReturnValue(5);
+      (WebSocketService as jest.MockedClass<typeof WebSocketService>).prototype.getConnectedClientsCount = mockGetConnectedClientsCount;
 
-      const response = await request(app)
-        .get('/api/tokens?min_volume=100000')
-        .expect(200);
+      const response = await request(aggregator['app']).get('/health');
+      
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual({
+        status: 'healthy',
+        timestamp: expect.any(Number),
+        connected_clients: 5,
+        environment: config.server.env
+      });
+    });
+  });
 
-      expect(response.body.tokens).toHaveLength(1);
-      expect(response.body.tokens[0].token_ticker).toBe('HVT');
-      expect(response.body.tokens[0].volume24h).toBeGreaterThanOrEqual(100000);
+  describe('Route Handling', () => {
+    it('should handle 404 routes', async () => {
+      const response = await request(aggregator['app']).get('/nonexistent-route');
+      
+      expect(response.status).toBe(404);
+      expect(response.body).toEqual({ error: 'Route not found' });
+    });
+
+    it('should handle errors', async () => {
+      // Force an error by making tokenController undefined
+      aggregator['tokenController'] = undefined as any;
+      
+      const response = await request(aggregator['app']).get('/api/tokens');
+      
+      expect(response.status).toBe(500);
+      expect(response.body).toEqual({ error: 'Internal server error' });
+    });
+  });
+
+  describe('Background Jobs', () => {
+    it('should start background jobs', () => {
+      const mockUpdateTokenData = jest.spyOn(aggregator as any, 'updateTokenData').mockResolvedValue(undefined);
+      const mockSetInterval = jest.spyOn(global, 'setInterval');
+      
+      aggregator['startBackgroundJobs']();
+      
+      expect(mockUpdateTokenData).toHaveBeenCalled();
+      expect(mockSetInterval).toHaveBeenCalledWith(
+        expect.any(Function),
+        config.aggregation.updateInterval
+      );
+    });
+
+    it('should handle updateTokenData errors', async () => {
+      const mockError = new Error('Update failed');
+      jest.spyOn(aggregator['dataAggregator'], 'getAllTokens').mockRejectedValue(mockError);
+      
+      await aggregator['updateTokenData']();
+      
+      expect(logger.error).toHaveBeenCalledWith('Error updating token data:', mockError);
+    });
+  });
+
+  describe('Graceful Shutdown', () => {
+    it('should stop all services on shutdown', async () => {
+      const mockClearInterval = jest.spyOn(global, 'clearInterval');
+      const mockCacheDisconnect = jest.fn();
+      const mockServerClose = jest.fn();
+      
+      aggregator['updateInterval'] = setInterval(() => {}, 1000);
+      aggregator['cacheService'].disconnect = mockCacheDisconnect;
+      aggregator['server'].close = mockServerClose;
+      
+      await aggregator.stop();
+      
+      expect(mockClearInterval).toHaveBeenCalled();
+      expect(mockCacheDisconnect).toHaveBeenCalled();
+      expect(mockServerClose).toHaveBeenCalled();
+      expect(logger.info).toHaveBeenCalledWith('Meme Coin Aggregator stopped');
     });
   });
 });

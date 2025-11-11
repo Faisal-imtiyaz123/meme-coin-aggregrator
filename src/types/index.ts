@@ -1,4 +1,3 @@
-// src/types/index.ts
 export interface TokenData {
   // Basic Identification
   token_address: string;

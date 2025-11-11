@@ -1,4 +1,3 @@
-// tests/integration/websocket.test.ts
 import { createServer } from 'http';
 import { Server as SocketIOServer } from 'socket.io';
 import { io as Client, Socket } from 'socket.io-client';

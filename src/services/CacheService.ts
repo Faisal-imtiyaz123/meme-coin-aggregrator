@@ -1,38 +1,69 @@
-// src/services/CacheService.ts
-import Redis from 'ioredis';
+import { createClient, RedisClientType } from 'redis';
 import { TokenData } from '../types';
 import { config } from '../config';
 import { logger } from '../utils/logger';
 
+// Create Redis client (remove this from your other file)
+const client: RedisClientType = createClient({
+  username: 'default',
+  password: 'rRlmzmHJ9dhY2z6ZBpgYLGtLclYJOaZ4',
+  socket: {
+    host: 'redis-14673.c14.us-east-1-3.ec2.cloud.redislabs.com',
+    port: 14673
+  }
+});
+
 export class CacheService {
-  private redis: Redis;
+  private redis: RedisClientType;
   private readonly DEFAULT_TTL = config.redis.ttl;
+  private isConnected: boolean = false;
 
   constructor() {
-    this.redis = new Redis(config.redis.url, {
-      connectTimeout: 10000,
-      commandTimeout: 5000,
-      disconnectTimeout: 2000,
-      maxRetriesPerRequest:3,
-      lazyConnect:true,
-    });
+    this.redis = client;
     this.setupEventListeners();
+    this.connect(); // Ensure connection on initialization
+  }
+
+  private async connect(): Promise<void> {
+    if (!this.isConnected) {
+      try {
+        await this.redis.connect();
+        this.isConnected = true;
+      } catch (error) {
+        logger.error('Failed to connect to Redis:', error);
+        throw error;
+      }
+    }
   }
 
   private setupEventListeners(): void {
     this.redis.on('connect', () => {
       logger.info('Redis connected successfully');
+      this.isConnected = true;
     });
 
-    this.redis.on('error', (error) => {
+    this.redis.on('error', (error: any) => {
       logger.error('Redis connection error:', error);
+      this.isConnected = false;
     });
+
+    this.redis.on('end', () => {
+      logger.info('Redis connection closed');
+      this.isConnected = false;
+    });
+  }
+
+  private async ensureConnected(): Promise<void> {
+    if (!this.isConnected) {
+      await this.connect();
+    }
   }
 
   async setTokens(tokens: TokenData[], ttl: number = this.DEFAULT_TTL): Promise<void> {
     try {
-      console.log("tokens set")
-      await this.redis.setex('tokens:all', ttl, JSON.stringify(tokens));
+      await this.ensureConnected();
+      await this.redis.setEx('tokens:all', ttl, JSON.stringify(tokens));
+      console.log("tokens set");
     } catch (error) {
       logger.error('Error caching tokens:', error);
       throw error;
@@ -41,6 +72,7 @@ export class CacheService {
 
   async getTokens(): Promise<TokenData[] | null> {
     try {
+      await this.ensureConnected();
       const cached = await this.redis.get('tokens:all');
       return cached ? JSON.parse(cached) : null;
     } catch (error) {
@@ -51,6 +83,7 @@ export class CacheService {
 
   async getToken(address: string): Promise<TokenData | null> {
     try {
+      await this.ensureConnected();
       const cached = await this.redis.get(`token:${address.toLowerCase()}`);
       return cached ? JSON.parse(cached) : null;
     } catch (error) {
@@ -61,8 +94,9 @@ export class CacheService {
 
   async setKey(key: string, value: any, ttl?: number): Promise<void> {
     try {
+      await this.ensureConnected();
       if (ttl) {
-        await this.redis.setex(key, ttl, JSON.stringify(value));
+        await this.redis.setEx(key, ttl, JSON.stringify(value));
       } else {
         await this.redis.set(key, JSON.stringify(value));
       }
@@ -74,6 +108,7 @@ export class CacheService {
 
   async getKey<T>(key: string): Promise<T | null> {
     try {
+      await this.ensureConnected();
       const cached = await this.redis.get(key);
       return cached ? JSON.parse(cached) : null;
     } catch (error) {
@@ -84,6 +119,7 @@ export class CacheService {
 
   async delKey(key: string): Promise<void> {
     try {
+      await this.ensureConnected();
       await this.redis.del(key);
     } catch (error) {
       logger.error('Error deleting cache key:', error);
@@ -92,6 +128,19 @@ export class CacheService {
   }
 
   async disconnect(): Promise<void> {
-    await this.redis.quit();
+    if (this.isConnected) {
+      await this.redis.quit();
+      this.isConnected = false;
+    }
+  }
+
+  // Health check method
+  async healthCheck(): Promise<boolean> {
+    try {
+      await this.redis.ping();
+      return true;
+    } catch (error) {
+      return false;
+    }
   }
 }
