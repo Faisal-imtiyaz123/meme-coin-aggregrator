@@ -8,12 +8,10 @@ import { logger } from '../utils/logger';
 export class TokenController {
   private cacheService: CacheService;
   private dataAggregator: DataAggregatorService;
-
   constructor(cacheService: CacheService, dataAggregator: DataAggregatorService) {
     this.cacheService = cacheService;
     this.dataAggregator = dataAggregator;
   }
-
   async getTokens(req: Request, res: Response): Promise<void> {
     try {
       const filters: FilterOptions = {
@@ -54,7 +52,6 @@ export class TokenController {
       });
     }
   }
-
   async getTokenByAddress(req: Request, res: Response): Promise<void> {
     try {
       const { address } = req.params;
@@ -95,56 +92,6 @@ export class TokenController {
       });
     }
   }
-
-  async getStats(req: Request, res: Response): Promise<void> {
-    try {
-      const tokens = await this.cacheService.getTokens();
-      
-      if (!tokens || tokens.length === 0) {
-        res.status(404).json({ error: 'No token data available' });
-        return;
-      }
-
-      const stats = {
-        total_tokens: tokens.length,
-        total_volume_24h: tokens.reduce((sum, token) => sum + (token.volume24h || 0), 0),
-        total_liquidity: tokens.reduce((sum, token) => sum + (token.liquidity || 0), 0),
-        total_market_cap: tokens.reduce((sum, token) => sum + (token.marketCap || 0), 0),
-        average_price_change_1h: tokens.reduce((sum, token) => sum + (token.priceChange1h || 0), 0) / tokens.length,
-        average_price_change_24h: tokens.reduce((sum, token) => sum + (token.priceChange24h || 0), 0) / tokens.length,
-        top_gainer_1h: tokens.reduce((max, token) => 
-          (token.priceChange1h || 0) > (max.priceChange1h || 0) ? token : max
-        ),
-        top_loser_1h: tokens.reduce((min, token) => 
-          (token.priceChange1h || 0) < (min.priceChange1h || 0) ? token : min
-        ),
-        top_gainer_24h: tokens.reduce((max, token) => 
-          (token.priceChangePercentage24h || 0) > (max.priceChangePercentage24h || 0) ? token : max
-        ),
-        top_loser_24h: tokens.reduce((min, token) => 
-          (token.priceChangePercentage24h || 0) < (min.priceChangePercentage24h || 0) ? token : min
-        ),
-        highest_volume: tokens.reduce((max, token) => 
-          (token.volume24h || 0) > (max.volume24h || 0) ? token : max
-        ),
-        highest_market_cap: tokens.reduce((max, token) => 
-          (token.marketCap || 0) > (max.marketCap || 0) ? token : max
-        ),
-        last_updated: new Date().toISOString(),
-        dexs: Array.from(new Set(tokens.map(t => t.dex))).filter(Boolean),
-        sources: Array.from(new Set(tokens.flatMap(t => t.source || []))).filter(Boolean)
-      };
-
-      res.json(stats);
-    } catch (error) {
-      logger.error('Error in getStats:', error);
-      res.status(500).json({ 
-        error: 'Failed to fetch stats',
-        details: error instanceof Error ? error.message : 'Unknown error'
-      });
-    }
-  }
-
   private applyFilters(tokens: TokenData[], filters: FilterOptions): TokenData[] {
     let filtered = [...tokens];
 
@@ -240,7 +187,6 @@ export class TokenController {
 
     return filtered;
   }
-
   private paginateTokens(tokens: TokenData[], filters: FilterOptions): PaginatedResponse {
     const limit = filters.limit || 20;
     const cursor = filters.cursor ? parseInt(filters.cursor) : 0;
@@ -256,42 +202,5 @@ export class TokenController {
       total_count: tokens.length,
       timestamp: Date.now()
     };
-  }
-
-  // Additional endpoint for token search
-  async searchTokens(req: Request, res: Response): Promise<void> {
-    try {
-      const { q } = req.query;
-      
-      if (!q || typeof q !== 'string') {
-        res.status(400).json({ error: 'Search query is required' });
-        return;
-      }
-
-      const tokens = await this.cacheService.getTokens();
-      if (!tokens) {
-        res.status(404).json({ error: 'No token data available' });
-        return;
-      }
-
-      const searchTerm = q.toLowerCase();
-      const results = tokens.filter(token =>
-        token.token_name.toLowerCase().includes(searchTerm) ||
-        token.token_ticker.toLowerCase().includes(searchTerm) ||
-        token.token_address.toLowerCase().includes(searchTerm)
-      );
-
-      res.json({
-        tokens: results,
-        total_count: results.length,
-        timestamp: Date.now()
-      });
-    } catch (error) {
-      logger.error('Error in searchTokens:', error);
-      res.status(500).json({ 
-        error: 'Failed to search tokens',
-        details: error instanceof Error ? error.message : 'Unknown error'
-      });
-    }
   }
 }
